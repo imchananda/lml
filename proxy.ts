@@ -1,8 +1,9 @@
-import { auth } from "@/auth"
+import NextAuth from "next-auth"
+import { authConfig } from "./auth.config"
 
-export default function proxy(req: any) {
-  return auth(req)
-}
+export default NextAuth(authConfig).auth
+
 export const config = {
   matcher: ['/((?!api/auth|login|_next|favicon).*)'],
 }
+
