@@ -2,22 +2,44 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { signIn } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Wallet } from "lucide-react"
+import { Wallet, Loader2 } from "lucide-react"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("test@example.com")
-  const [password, setPassword] = useState("password123")
+  const [email, setEmail] = useState("dev@test.com")
+  const [password, setPassword] = useState("Chananda#0114@Admin")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
   const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    // For MVP frontend development, we just bypass if backend isn't fully ready
-    // You will need NextAuth signIn here
-    router.push("/dashboard")
+    setLoading(true)
+    setError("")
+    
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      })
+
+      if (result?.error) {
+        setError("อีเมลหรือรหัสผ่านไม่ถูกต้อง")
+      } else {
+        router.push("/")
+        router.refresh()
+      }
+    } catch (err) {
+      setError("เกิดข้อผิดพลาดในการเข้าสู่ระบบ")
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -36,6 +58,11 @@ export default function LoginPage() {
         </CardHeader>
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">
+            {error && (
+              <div className="p-3 text-sm text-red-500 bg-red-500/10 border border-red-500/20 rounded-lg text-center font-medium animate-in fade-in duration-200">
+                {error}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input 
@@ -43,8 +70,9 @@ export default function LoginPage() {
                 type="email" 
                 placeholder="m@example.com" 
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); setError("") }}
                 required 
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -53,14 +81,22 @@ export default function LoginPage() {
                 id="password" 
                 type="password" 
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); setError("") }}
                 required 
+                disabled={loading}
               />
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700">
-              Sign In
+            <Button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center gap-2">
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  กำลังลงชื่อเข้าใช้...
+                </>
+              ) : (
+                "Sign In"
+              )}
             </Button>
           </CardFooter>
         </form>
@@ -68,3 +104,4 @@ export default function LoginPage() {
     </div>
   )
 }
+
