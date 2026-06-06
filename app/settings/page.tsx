@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Loader2, Settings, UserCircle, Plus, Trash2, ArrowUpRight, ArrowDownRight, RefreshCw, Edit2, Bell } from "lucide-react"
+import { Loader2, Settings, UserCircle, Plus, Trash2, ArrowUpRight, ArrowDownRight, RefreshCw, Edit2, Bell, Lock } from "lucide-react"
 import { toast } from "sonner"
 import { RecurringForm } from "@/components/forms/RecurringForm"
 import { NotificationSettings } from "@/components/settings/NotificationSettings"
@@ -35,12 +35,17 @@ export default function SettingsPage() {
   const [recurring, setRecurring] = useState<RecurringItem[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState<'profile' | 'recurring' | 'notifications'>('profile')
+  const [activeTab, setActiveTab] = useState<'profile' | 'recurring' | 'notifications' | 'security'>('profile')
   const [openIncome, setOpenIncome] = useState(false)
   const [openExpense, setOpenExpense] = useState(false)
   const [editRecurring, setEditRecurring] = useState<RecurringItem | null>(null)
   const [uploading, setUploading] = useState(false)
   const [tempImage, setTempImage] = useState<string | null>(null)
+
+  // Security (PIN/Password) settings state
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmNewPassword, setConfirmNewPassword] = useState("")
+  const [updatingPassword, setUpdatingPassword] = useState(false)
 
   const fetchData = useCallback(async () => {
     try {
@@ -78,6 +83,40 @@ export default function SettingsPage() {
       window.dispatchEvent(new Event("profile-updated"))
     } catch { toast.error('บันทึกไม่สำเร็จ') }
     setSaving(false)
+  }
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (newPassword.length < 4) {
+      toast.error("รหัสผ่าน/PIN ต้องมีอย่างน้อย 4 ตัวอักษร/ตัวเลข")
+      return
+    }
+    if (newPassword !== confirmNewPassword) {
+      toast.error("รหัสผ่านใหม่และยืนยันรหัสผ่านไม่ตรงกัน")
+      return
+    }
+    setUpdatingPassword(true)
+    try {
+      const res = await fetch("/api/auth/set-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: newPassword })
+      })
+
+      if (res.ok) {
+        toast.success("เปลี่ยนรหัสผ่าน/PIN สำเร็จแล้ว! บัญชีของคุณได้รับการอัปเดต")
+        setNewPassword("")
+        setConfirmNewPassword("")
+        sessionStorage.setItem("app_unlocked", "true")
+      } else {
+        const data = await res.json()
+        toast.error(data.error || "เปลี่ยนรหัสผ่านไม่สำเร็จ")
+      }
+    } catch {
+      toast.error("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์")
+    } finally {
+      setUpdatingPassword(false)
+    }
   }
 
   const deleteRecurring = async (id: string) => {
@@ -124,6 +163,12 @@ export default function SettingsPage() {
             className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${activeTab === 'notifications' ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400' : 'text-muted-foreground hover:bg-muted/50'}`}
           >
             <Bell className="h-4 w-4" /> แจ้งเตือน (Notifications)
+          </button>
+          <button 
+            onClick={() => setActiveTab('security')}
+            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${activeTab === 'security' ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400' : 'text-muted-foreground hover:bg-muted/50'}`}
+          >
+            <Lock className="h-4 w-4" /> ความปลอดภัย (Security / PIN)
           </button>
         </nav>
 
@@ -366,6 +411,46 @@ export default function SettingsPage() {
           )}
           {activeTab === 'notifications' && (
             <NotificationSettings />
+          )}
+          {activeTab === 'security' && (
+            <Card className="glass-card shadow-lg shadow-black/5">
+              <CardHeader>
+                <CardTitle>ตั้งค่ารหัสผ่าน & PIN (Security / PIN)</CardTitle>
+                <CardDescription>
+                  เปลี่ยนรหัสผ่านสำหรับเข้าสู่ระบบและรหัสผ่านล็อกแอป (PIN) ของคุณ
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleUpdatePassword} className="space-y-4 max-w-md">
+                  <div className="grid gap-2">
+                    <Label htmlFor="new-password">รหัสผ่าน / PIN ใหม่ (อย่างน้อย 4 ตัวอักษรหรือตัวเลข)</Label>
+                    <Input 
+                      id="new-password" 
+                      type="password" 
+                      placeholder="ใส่ PIN หรือรหัสผ่านใหม่..."
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required 
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="confirm-new-password">ยืนยัน รหัสผ่าน / PIN ใหม่</Label>
+                    <Input 
+                      id="confirm-new-password" 
+                      type="password" 
+                      placeholder="ยืนยัน PIN หรือรหัสผ่านใหม่..."
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      required 
+                    />
+                  </div>
+                  <Button type="submit" disabled={updatingPassword} className="bg-emerald-600 hover:bg-emerald-700 shadow-md flex items-center gap-2">
+                    {updatingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
+                    บันทึกรหัสผ่านใหม่
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
           )}
         </div>
       </div>
