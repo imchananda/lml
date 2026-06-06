@@ -12,6 +12,7 @@ model User {
   name          String?
   email         String    @unique
   password      String?
+  appLockPin    String?
   image         String?
   birthDate     DateTime?
   currency      String    @default("THB")

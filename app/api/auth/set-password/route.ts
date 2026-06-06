@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
 
     await prisma.user.update({
       where: { id: userId },
-      data: { password }
+      data: { appLockPin: password }
     })
 
     return NextResponse.json({ success: true })

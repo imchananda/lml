@@ -16,16 +16,15 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { password: true }
+      select: { appLockPin: true }
     })
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
 
-    // If user has no password set, any non-empty password is rejected
-    // and we prompt them to set one first
-    if (!user.password) {
+    // If user has no PIN set, prompt them to set one first
+    if (!user.appLockPin) {
       return NextResponse.json({ 
         verified: false, 
         noPassword: true,
@@ -33,8 +32,8 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Compare password (plain text for now, same as auth.ts)
-    const isValid = password === user.password
+    // Compare PIN
+    const isValid = password === user.appLockPin
     return NextResponse.json({ verified: isValid })
   } catch (error) {
     console.error("Verify password error:", error)
