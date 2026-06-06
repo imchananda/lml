@@ -10,8 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Wallet, Loader2 } from "lucide-react"
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("dev@test.com")
-  const [password, setPassword] = useState("Chananda#0114@Admin")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const router = useRouter()
