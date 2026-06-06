@@ -1,0 +1,815 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String?
+  image         String?
+  birthDate     DateTime?
+  currency      String    @default("THB")
+  monthlyIncome    Float     @default(0)
+  creditScore      Int?              // คะแนนเครดิตบูโร (0-900)
+  creditScoreDate  DateTime?         // วันที่ตรวจคะแนนเครดิต
+  targetAllocation Json?             // สัดส่วนพอร์ตเป้าหมายสำหรับ Rebalancing
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  transactions   Transaction[]
+  budgets        Budget[]
+  debts          Debt[]
+  savingPots     SavingPot[]
+  investments    Investment[]
+  goals          Goal[]
+  recurringItems    RecurringItem[]
+  creditBureauItems CreditBureau[]
+  creditScoreHistory CreditScoreHistory[]
+  taxProfiles       TaxProfile[]
+  aiInsights        AiInsight[]
+
+  // Health Module (NEW)
+  healthProfile     HealthProfile?
+  bodyMetrics       BodyMetric[]
+  bodyMeasurements  BodyMeasurement[]
+  calorieLogs       CalorieLog[]
+  workoutLogs       WorkoutLog[]
+  healthGoals       HealthGoal[]
+  foodItems         FoodItem[]
+
+  // Study Module (NEW)
+  studyExams        StudyExam[]
+  studyBooks        StudyBook[]
+  studySessions     StudySession[]
+  studyScores       StudyScore[]
+  studySchedules    StudySchedule[]
+
+  // Todo Module (NEW)
+  todoTasks         TodoTask[]
+  todoCategories    TodoCategory[]
+
+  // Notification Settings
+  notificationSettings NotificationSetting[]
+
+  @@map("users")
+}
+
+model Category {
+  id    String          @id @default(cuid())
+  name  String
+  icon  String?
+  color String          @default("#6366f1")
+  type  TransactionType @default(EXPENSE)
+
+  transactions Transaction[]
+  budgets      Budget[]
+
+  @@map("categories")
+}
+
+model Transaction {
+  id          String          @id @default(cuid())
+  amount      Float
+  type        TransactionType
+  description String?
+  note        String?
+  date        DateTime        @default(now())
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id])
+  recurringId String?
+  recurring   RecurringItem? @relation(fields: [recurringId], references: [id])
+
+  @@index([userId, date])
+  @@index([userId, type])
+  @@map("transactions")
+}
+
+model RecurringItem {
+  id         String          @id @default(cuid())
+  name       String
+  amount     Float
+  type       TransactionType
+  frequency  Frequency
+  nextDate   DateTime
+  dayOfMonth Int?
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+
+  userId     String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId String?
+  transactions Transaction[]
+
+  @@map("recurring_items")
+}
+
+model Budget {
+  id         String   @id @default(cuid())
+  amount     Float
+  month      Int
+  year       Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  @@unique([userId, categoryId, month, year])
+  @@map("budgets")
+}
+
+model Debt {
+  id             String    @id @default(cuid())
+  name           String
+  type           DebtType
+  totalAmount    Float
+  currentBalance Float
+  interestRate   Float     // APR %
+  minimumPayment Float
+  dueDate        Int?      // day of month
+  isActive       Boolean   @default(true)
+  notes          String?
+  asOfDate       DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments DebtPayment[]
+
+  @@map("debts")
+}
+
+model DebtPayment {
+  id     String   @id @default(cuid())
+  amount Float
+  date   DateTime @default(now())
+  note   String?
+
+  debtId String
+  debt   Debt   @relation(fields: [debtId], references: [id], onDelete: Cascade)
+
+  @@map("debt_payments")
+}
+
+model CreditBureau {
+  id               String                  @id @default(cuid())
+  accountName      String
+  accountType      CreditBureauAccountType
+  lender           String                  // ชื่อสถาบันการเงิน
+  creditLimit      Float?                  // วงเงิน (ถ้ามี)
+  outstandingBalance Float                 // ยอดหนี้คงค้างตามเครดิตบูโร
+  monthlyPayment   Float                   @default(0)
+  status           CreditBureauStatus      @default(NORMAL)
+  reportDate       DateTime                // วันที่ข้อมูลจากเครดิตบูโร
+  inquiryDate      DateTime                @default(now()) // วันที่สืบค้น
+  accountOpenDate  DateTime?               // วันที่เปิดบัญชี
+  notes            String?
+  isActive         Boolean                 @default(true)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  userId           String
+  user             User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  history          CreditBureauHistory[]
+
+  @@map("credit_bureau")
+}
+
+model CreditScoreHistory {
+  id        String   @id @default(cuid())
+  score     Int
+  date      DateTime // normalized to 1st of month
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("credit_score_histories")
+}
+
+model CreditBureauHistory {
+  id                 String   @id @default(cuid())
+  outstandingBalance Float
+  creditLimit        Float?
+  monthlyPayment     Float    @default(0)
+  status             CreditBureauStatus @default(NORMAL)
+  reportDate         DateTime // normalized to 1st of month
+  inquiryDate        DateTime @default(now()) // วันที่สืบค้น
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  creditBureauId     String
+  creditBureau       CreditBureau @relation(fields: [creditBureauId], references: [id], onDelete: Cascade)
+
+  @@unique([creditBureauId, reportDate])
+  @@map("credit_bureau_histories")
+}
+
+model SavingPot {
+  id             String     @id @default(cuid())
+  name           String
+  targetAmount   Float
+  savedAmount    Float      @default(0)
+  term           SavingTerm
+  targetDate     DateTime?
+  icon           String?
+  color          String     @default("#10b981")
+  isActive       Boolean    @default(true)
+  autoSaveAmount Float?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  userId       String
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions SavingTransaction[]
+
+  @@map("saving_pots")
+}
+
+model SavingTransaction {
+  id     String   @id @default(cuid())
+  amount Float
+  type   String   // DEPOSIT | WITHDRAW
+  date   DateTime @default(now())
+  note   String?
+
+  potId String
+  pot   SavingPot @relation(fields: [potId], references: [id], onDelete: Cascade)
+
+  @@map("saving_transactions")
+}
+
+model Investment {
+  id           String    @id @default(cuid())
+  name         String
+  ticker       String?
+  assetType    AssetType
+  quantity     Float
+  costBasis    Float
+  currentPrice Float?
+  currency     String    @default("THB")
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  userId       String
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions InvestmentTransaction[]
+
+  @@map("investments")
+}
+
+model InvestmentTransaction {
+  id       String   @id @default(cuid())
+  type     String   // BUY | SELL
+  quantity Float
+  price    Float
+  fee      Float    @default(0)
+  date     DateTime @default(now())
+  note     String?
+
+  investmentId String
+  investment   Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+
+  @@map("investment_transactions")
+}
+
+model Goal {
+  id           String     @id @default(cuid())
+  name         String
+  description  String?
+  targetAmount Float
+  savedAmount  Float      @default(0)
+  deadline     DateTime?
+  priority     Priority   @default(MEDIUM)
+  status       GoalStatus @default(IN_PROGRESS)
+  icon         String?
+  color        String     @default("#6366f1")
+  linkedPotId  String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  userId     String
+  user       User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  milestones GoalMilestone[]
+
+  @@map("goals")
+}
+
+model GoalMilestone {
+  id           String    @id @default(cuid())
+  title        String
+  targetAmount Float
+  reachedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  goalId String
+  goal   Goal   @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@map("goal_milestones")
+}
+
+model TaxProfile {
+  id                String   @id @default(cuid())
+  year              Int      // ปีภาษี เช่น 2024
+  
+  // รายได้ประเมิน
+  estimatedIncome   Float    @default(0) 
+  bonus             Float    @default(0)
+  
+  // ค่าลดหย่อนครอบครัว
+  hasSpouse         Boolean  @default(false)
+  childrenCount     Int      @default(0)
+  parentsCount      Int      @default(0)
+  
+  // กองทุน/ประกันที่ซื้อแล้ว
+  providentFund     Float    @default(0)
+  lifeInsurance     Float    @default(0)
+  healthInsurance   Float    @default(0)
+  pensionInsurance  Float    @default(0)
+  ssf               Float    @default(0)
+  rmf               Float    @default(0)
+  thaiEsg           Float    @default(0)
+  socialSecurity    Float    @default(9000)
+  homeLoanInterest  Float    @default(0)
+  donations         Float    @default(0)
+  eduDonations      Float    @default(0)
+  otherDeductions   Float    @default(0) // อื่นๆ
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, year])
+  @@map("tax_profiles")
+}
+
+model AiInsight {
+  id        String   @id @default(cuid())
+  type      String   // MONTHLY_CASHFLOW | PORTFOLIO_HEALTH | TAX_ALERT | DEBT_ALERT | FULL_REPORT
+  content   String   // JSON string: { summary, items[], severity }
+  month     Int?     // เดือน (สำหรับ MONTHLY_CASHFLOW)
+  year      Int?     // ปี
+  expiresAt DateTime // TTL: วันหมดอายุ Cache
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, month, year])
+  @@map("ai_insights")
+}
+
+// Enums
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum Frequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum DebtType {
+  CREDIT_CARD
+  PERSONAL_LOAN
+  MORTGAGE
+  CAR_LOAN
+  STUDENT_LOAN
+  OTHER
+}
+
+enum SavingTerm {
+  SHORT
+  MEDIUM
+  LONG
+}
+
+enum AssetType {
+  STOCK
+  ETF
+  MUTUAL_FUND
+  GOLD
+  CRYPTO
+  BOND
+  REAL_ESTATE
+  OTHER
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum GoalStatus {
+  IN_PROGRESS
+  COMPLETED
+  PAUSED
+  CANCELLED
+}
+
+enum CreditBureauAccountType {
+  CREDIT_CARD
+  PERSONAL_LOAN
+  MORTGAGE
+  CAR_LOAN
+  STUDENT_LOAN
+  OVERDRAFT
+  HIRE_PURCHASE
+  OTHER
+}
+
+enum CreditBureauStatus {
+  NORMAL        // ปกติ
+  DELINQUENT    // ค้างชำระ
+  CLOSED        // ปิดแล้ว
+  WRITTEN_OFF   // ตัดหนี้สูญ
+  RESTRUCTURED  // ปรับโครงสร้าง
+}
+
+// ══════════════════════ HEALTH MODULE ══════════════════════
+
+model HealthProfile {
+  id              String        @id @default(cuid())
+  heightCm        Float         // ส่วนสูง (cm)
+  gender          Gender        @default(MALE)
+  activityLevel   ActivityLevel @default(MODERATE)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  userId          String        @unique
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("health_profiles")
+}
+
+model BodyMetric {
+  id              String    @id @default(cuid())
+  date            DateTime  @default(now())
+  weightKg        Float     // น้ำหนัก (kg)
+  bodyFatPct      Float?    // % ไขมัน
+  muscleMassKg    Float?    // มวลกล้ามเนื้อ (kg)
+  note            String?
+  createdAt       DateTime  @default(now())
+
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("body_metrics")
+}
+
+model BodyMeasurement {
+  id              String    @id @default(cuid())
+  date            DateTime  @default(now())
+  waistCm         Float?    // รอบเอว
+  hipCm           Float?    // รอบสะโพก
+  chestCm         Float?    // รอบอก
+  leftArmCm       Float?    // แขนซ้าย
+  rightArmCm      Float?    // แขนขวา
+  leftThighCm     Float?    // ต้นขาซ้าย
+  rightThighCm    Float?    // ต้นขาขวา
+  leftCalfCm      Float?    // น่องซ้าย
+  rightCalfCm     Float?    // น่องขวา
+  buttCm          Float?    // รอบก้น
+  neckCm          Float?    // รอบคอ
+  note            String?
+  createdAt       DateTime  @default(now())
+
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("body_measurements")
+}
+
+model CalorieLog {
+  id              String    @id @default(cuid())
+  date            DateTime  @default(now())
+  mealType        MealType  // BREAKFAST, LUNCH, DINNER, SNACK
+  foodName        String    // ชื่ออาหาร
+  calories        Int       // kcal
+  proteinG        Float?    // โปรตีน (g)
+  carbsG          Float?    // คาร์บ (g)
+  fatG            Float?    // ไขมัน (g)
+  note            String?
+  createdAt       DateTime  @default(now())
+
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("calorie_logs")
+}
+
+model WorkoutLog {
+  id              String       @id @default(cuid())
+  date            DateTime     @default(now())
+  workoutType     WorkoutType  // CARDIO, STRENGTH, FLEXIBILITY, SPORTS, OTHER
+  name            String       // ชื่อท่า/กิจกรรม
+  durationMinutes Int          // ระยะเวลา (นาที)
+  caloriesBurned  Int?         // แคลอรีที่เผาผลาญ
+  sets            Int?         // จำนวนเซ็ต
+  reps            Int?         // จำนวนครั้ง
+  weightKg        Float?       // น้ำหนักที่ยก (kg)
+  note            String?
+  createdAt       DateTime     @default(now())
+
+  userId          String
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("workout_logs")
+}
+
+model HealthGoal {
+  id              String         @id @default(cuid())
+  type            HealthGoalType // WEIGHT_LOSS, WEIGHT_GAIN, etc.
+  targetValue     Float          // ค่าเป้าหมาย
+  startValue      Float          // ค่าเริ่มต้น
+  currentValue    Float          // ค่าปัจจุบัน
+  unit            String         @default("kg")
+  deadline        DateTime?
+  status          GoalStatus     @default(IN_PROGRESS)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("health_goals")
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum ActivityLevel {
+  SEDENTARY
+  LIGHT
+  MODERATE
+  ACTIVE
+  VERY_ACTIVE
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+enum WorkoutType {
+  CARDIO
+  STRENGTH
+  FLEXIBILITY
+  SPORTS
+  OTHER
+}
+
+enum HealthGoalType {
+  WEIGHT_LOSS
+  WEIGHT_GAIN
+  MAINTAIN
+  BODY_FAT_REDUCTION
+  MUSCLE_GAIN
+}
+
+
+// ══════════════════════ STUDY MODULE ══════════════════════
+// สำหรับสอบเข้า ป.โท วิศวกรรมซอฟต์แวร์ จุฬาฯ
+
+model StudyExam {
+  id              String    @id @default(cuid())
+  name            String    // เช่น "สอบเข้า ป.โท วิศวกรรมซอฟต์แวร์ จุฬาฯ"
+  examDate        DateTime  // วันสอบ
+  university      String?   // "จุฬาลงกรณ์มหาวิทยาลัย"
+  program         String?   // "วิศวกรรมซอฟต์แวร์"
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjects        StudySubject[]
+
+  @@map("study_exams")
+}
+
+model StudySubject {
+  id              String    @id @default(cuid())
+  name            String    // เช่น "CU-TEP", "Algorithms", "Software Engineering"
+  weight          Float?    // สัดส่วนคะแนน (%)
+  targetScore     Float?    // คะแนนเป้าหมาย
+  color           String    @default("#6366f1")
+  sortOrder       Int       @default(0)
+  createdAt       DateTime  @default(now())
+
+  examId          String
+  exam            StudyExam @relation(fields: [examId], references: [id], onDelete: Cascade)
+  books           StudyBook[]
+  sessions        StudySession[]
+  scores          StudyScore[]
+
+  @@map("study_subjects")
+}
+
+model StudyBook {
+  id              String     @id @default(cuid())
+  title           String     // ชื่อหนังสือ
+  author          String?
+  totalPages      Int        // จำนวนหน้าทั้งหมด
+  currentPage     Int        @default(0)
+  totalChapters   Int?
+  currentChapter  Int        @default(0)
+  priority        Priority   @default(MEDIUM)
+  status          BookStatus @default(NOT_STARTED)
+  coverColor      String     @default("#3b82f6")
+  notes           String?
+  startDate       DateTime?
+  finishDate      DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  subjectId       String?
+  subject         StudySubject? @relation(fields: [subjectId], references: [id])
+  userId          String
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("study_books")
+}
+
+model StudySession {
+  id              String    @id @default(cuid())
+  date            DateTime  @default(now())
+  durationMinutes Int       // ระยะเวลาอ่าน (นาที)
+  pagesRead       Int?      // หน้าที่อ่านได้
+  note            String?
+  createdAt       DateTime  @default(now())
+
+  subjectId       String?
+  subject         StudySubject? @relation(fields: [subjectId], references: [id])
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("study_sessions")
+}
+
+model StudyScore {
+  id              String    @id @default(cuid())
+  testName        String    // ชื่อข้อสอบ
+  score           Float
+  maxScore        Float
+  date            DateTime  @default(now())
+  note            String?
+  createdAt       DateTime  @default(now())
+
+  subjectId       String
+  subject         StudySubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("study_scores")
+}
+
+model StudySchedule {
+  id              String    @id @default(cuid())
+  title           String    // "อ่าน Algorithms Ch.5" หรือ "วันสอบ CU-TEP"
+  date            DateTime? // วันที่เฉพาะ (ถ้าเป็น one-time event)
+  dayOfWeek       Int?      // 0-6 (ถ้าเป็น recurring weekly)
+  startTime       String    // "09:00"
+  endTime         String    // "11:00"
+  type            ScheduleType @default(STUDY) // STUDY, EXAM, REVIEW, BREAK
+  isRecurring     Boolean   @default(false)
+  color           String    @default("#3b82f6")
+  createdAt       DateTime  @default(now())
+
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("study_schedules")
+}
+
+enum BookStatus {
+  NOT_STARTED
+  READING
+  COMPLETED
+  ON_HOLD
+}
+
+enum ScheduleType {
+  STUDY
+  EXAM
+  REVIEW
+  BREAK
+}
+
+
+// ══════════════════════ TODO MODULE ══════════════════════
+
+model TodoTask {
+  id              String       @id @default(cuid())
+  title           String
+  description     String?
+  date            DateTime     @default(now()) // วันที่ของ task
+  dueTime         String?      // "14:30" (optional)
+  priority        Priority     @default(MEDIUM)
+  status          TodoStatus   @default(PENDING)
+  completedAt     DateTime?
+  sortOrder       Int          @default(0)
+  isRecurring     Boolean      @default(false)
+  recurFrequency  Frequency?   // DAILY, WEEKLY, MONTHLY (reuse existing enum)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  categoryId      String?
+  category        TodoCategory? @relation(fields: [categoryId], references: [id])
+  userId          String
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@index([userId, status])
+  @@map("todo_tasks")
+}
+
+model TodoCategory {
+  id              String    @id @default(cuid())
+  name            String    // เช่น "งาน", "ส่วนตัว", "การเงิน", "สุขภาพ", "การเรียน"
+  icon            String?
+  color           String    @default("#6366f1")
+  createdAt       DateTime  @default(now())
+
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks           TodoTask[]
+
+  @@map("todo_categories")
+}
+
+enum TodoStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model FoodItem {
+  id        String   @id @default(cuid())
+  name      String   // ชื่ออาหาร
+  calories  Int      // แคลอรี (kcal)
+  proteinG  Float?   // โปรตีน (g)
+  carbsG    Float?   // คาร์โบไฮเดรต (g)
+  fatG      Float?   // ไขมัน (g)
+  isCustom  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("food_items")
+}
+
+
+// ══════════════════════ NOTIFICATION SETTINGS ══════════════════════
+
+model NotificationSetting {
+  id          String   @id @default(cuid())
+  key         String   // e.g. "fin_dsr", "remind_food"
+  enabled     Boolean  @default(true)
+  threshold   Float?   // ค่าเกณฑ์ที่ปรับได้ (ถ้ามี)
+  dayInterval Int?     // สำหรับ reminder (เตือนทุกกี่วัน)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@map("notification_settings")
+}
+
