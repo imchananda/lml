@@ -83,16 +83,26 @@ export async function getUserFinancialContext(userId: string) {
   // ─── Debt & DSR ─────────────────────────────────────────────
   const debts = await prisma.debt.findMany({ where: { userId, isActive: true } })
   
-  // Group active debts by name (case-insensitive) and select the latest record for each
-  const latestDebtsByName: Record<string, typeof debts[0]> = {}
-  debts.forEach(d => {
-    const nameKey = d.name.trim().toLowerCase()
-    const existing = latestDebtsByName[nameKey]
-    if (!existing || new Date(d.asOfDate) > new Date(existing.asOfDate)) {
-      latestDebtsByName[nameKey] = d
+  // Calculate total debt using only the latest month that has records
+  let latestDebtsList: typeof debts = []
+  if (debts.length > 0) {
+    let latestTime = 0
+    debts.forEach(d => {
+      if (!d.asOfDate) return
+      const time = new Date(d.asOfDate).getTime()
+      if (time > latestTime) latestTime = time
+    })
+    if (latestTime > 0) {
+      const latestDate = new Date(latestTime)
+      const latestMonth = latestDate.getMonth()
+      const latestYear = latestDate.getFullYear()
+      latestDebtsList = debts.filter(d => {
+        if (!d.asOfDate) return false
+        const dDate = new Date(d.asOfDate)
+        return dDate.getMonth() === latestMonth && dDate.getFullYear() === latestYear
+      })
     }
-  })
-  const latestDebtsList = Object.values(latestDebtsByName)
+  }
   
   const totalDebt    = latestDebtsList.reduce((s, d) => s + d.currentBalance, 0)
   const totalMinPmt  = latestDebtsList.reduce((s, d) => s + d.minimumPayment, 0)

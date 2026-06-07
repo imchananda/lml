@@ -141,16 +141,27 @@ export async function GET() {
 
     const monthlyIncome = incomeAgg._sum.amount || 0
     const monthlyExpense = expenseAgg._sum.amount || 0
-    // Group active debts by name (case-insensitive) and select the latest record for each
-    const latestDebtsByName: Record<string, typeof debtMinPayments[0]> = {}
-    debtMinPayments.forEach(d => {
-      const nameKey = d.name.trim().toLowerCase()
-      const existing = latestDebtsByName[nameKey]
-      if (!existing || new Date(d.asOfDate) > new Date(existing.asOfDate)) {
-        latestDebtsByName[nameKey] = d
+    // Calculate total minimum payment using only the latest month that has records
+    let totalMinPayment = 0
+    if (debtMinPayments.length > 0) {
+      let latestTime = 0
+      debtMinPayments.forEach(d => {
+        if (!d.asOfDate) return
+        const time = new Date(d.asOfDate).getTime()
+        if (time > latestTime) latestTime = time
+      })
+      if (latestTime > 0) {
+        const latestDate = new Date(latestTime)
+        const latestMonth = latestDate.getMonth()
+        const latestYear = latestDate.getFullYear()
+        const latestMonthDebts = debtMinPayments.filter(d => {
+          if (!d.asOfDate) return false
+          const dDate = new Date(d.asOfDate)
+          return dDate.getMonth() === latestMonth && dDate.getFullYear() === latestYear
+        })
+        totalMinPayment = latestMonthDebts.reduce((s, d) => s + d.minimumPayment, 0)
       }
-    })
-    const totalMinPayment = Object.values(latestDebtsByName).reduce((s, d) => s + d.minimumPayment, 0)
+    }
     const dsr = monthlyIncome > 0 ? Math.round((totalMinPayment / monthlyIncome) * 100) : 0
     const savingsRate = monthlyIncome > 0 ? Math.round(((monthlyIncome - monthlyExpense) / monthlyIncome) * 100) : 0
 

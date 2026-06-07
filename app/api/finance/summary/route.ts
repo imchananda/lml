@@ -129,16 +129,27 @@ export async function GET(req: Request) {
 
     const totalSavingsVal = totalSavings._sum.savedAmount || 0
     
-    // Group active debts by name (case-insensitive) and select the latest record for each
-    const latestDebtsByName: Record<string, typeof totalDebt[0]> = {}
-    totalDebt.forEach(d => {
-      const nameKey = d.name.trim().toLowerCase()
-      const existing = latestDebtsByName[nameKey]
-      if (!existing || new Date(d.asOfDate) > new Date(existing.asOfDate)) {
-        latestDebtsByName[nameKey] = d
+    // Calculate total debt using only the latest month that has records
+    let totalDebtVal = 0
+    if (totalDebt.length > 0) {
+      let latestTime = 0
+      totalDebt.forEach(d => {
+        if (!d.asOfDate) return
+        const time = new Date(d.asOfDate).getTime()
+        if (time > latestTime) latestTime = time
+      })
+      if (latestTime > 0) {
+        const latestDate = new Date(latestTime)
+        const latestMonth = latestDate.getMonth()
+        const latestYear = latestDate.getFullYear()
+        const latestMonthDebts = totalDebt.filter(d => {
+          if (!d.asOfDate) return false
+          const dDate = new Date(d.asOfDate)
+          return dDate.getMonth() === latestMonth && dDate.getFullYear() === latestYear
+        })
+        totalDebtVal = latestMonthDebts.reduce((s, d) => s + d.currentBalance, 0)
       }
-    })
-    const totalDebtVal = Object.values(latestDebtsByName).reduce((s, d) => s + d.currentBalance, 0)
+    }
     
     const totalInvestmentValue = investments.reduce((sum, inv) => sum + (inv.currentPrice ?? 0) * inv.quantity, 0)
     const netWorth = totalSavingsVal + totalInvestmentValue - totalDebtVal
