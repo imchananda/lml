@@ -118,3 +118,63 @@ export function estimateWeeksToGoal(currentWeight: number, targetWeight: number,
     weeklyLossKg
   }
 }
+
+export function calculateHealthyWeightLossMacros(
+  weightKg: number,
+  gender: "MALE" | "FEMALE",
+  bmr: number,
+  tdee: number
+): {
+  caloriesTarget: number
+  proteinG: number
+  carbsG: number
+  fatG: number
+  proteinPct: number
+  carbsPct: number
+  fatPct: number
+  isLimitedBySafety: boolean
+} {
+  // Target deficit is 500 kcal for healthy weight loss
+  const rawTarget = tdee - 500
+
+  // Safe lower limit: BMR or hard floor (1200 kcal for females, 1500 kcal for males)
+  const safeFloor = gender === "FEMALE" ? Math.max(bmr, 1200) : Math.max(bmr, 1500)
+  
+  let caloriesTarget = Math.round(rawTarget)
+  let isLimitedBySafety = false
+
+  if (caloriesTarget < safeFloor) {
+    caloriesTarget = Math.round(safeFloor)
+    isLimitedBySafety = true
+  }
+
+  // Protein: 1.8g per kg of body weight (Standard for muscle preservation)
+  const proteinG = Math.round(weightKg * 1.8)
+  const proteinKcal = proteinG * 4
+
+  // Fat: 25% of target calories
+  const fatKcal = caloriesTarget * 0.25
+  const fatG = Math.round(fatKcal / 9)
+
+  // Carbs: remaining calories
+  const carbsKcal = Math.max(0, caloriesTarget - proteinKcal - fatKcal)
+  const carbsG = Math.round(carbsKcal / 4)
+
+  // Percentages calculations
+  const totalKcal = (proteinG * 4) + (carbsG * 4) + (fatG * 9)
+  const proteinPct = totalKcal > 0 ? Math.round((proteinG * 4 / totalKcal) * 100) : 30
+  const fatPct = totalKcal > 0 ? Math.round((fatG * 9 / totalKcal) * 100) : 25
+  const carbsPct = 100 - proteinPct - fatPct
+
+  return {
+    caloriesTarget,
+    proteinG,
+    carbsG,
+    fatG,
+    proteinPct,
+    carbsPct,
+    fatPct,
+    isLimitedBySafety
+  }
+}
+

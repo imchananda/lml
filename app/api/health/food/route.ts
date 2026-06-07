@@ -18,6 +18,8 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const query = searchParams.get("query") || ""
+    const limitParam = searchParams.get("limit")
+    const limit = limitParam ? parseInt(limitParam, 10) : undefined
 
     // Find items that are system default (userId is null) OR custom for the current user
     const foods = await prisma.foodItem.findMany({
@@ -32,7 +34,7 @@ export async function GET(req: NextRequest) {
         }
       },
       orderBy: { name: "asc" },
-      take: 20
+      ...(limit ? { take: limit } : {})
     })
 
     return NextResponse.json(foods)
@@ -81,5 +83,79 @@ export async function POST(req: NextRequest) {
     }
     console.error(error)
     return NextResponse.json({ error: "Failed to save custom food item" }, { status: 500 })
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  const userId = await getCurrentUserId()
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  try {
+    const body = await req.json()
+    const parsed = foodItemSchema.extend({ id: z.string() }).parse(body)
+
+    // Check if it exists and belongs to the user
+    const existing = await prisma.foodItem.findUnique({
+      where: { id: parsed.id }
+    })
+
+    if (!existing) {
+      return NextResponse.json({ error: "ไม่พบเมนูอาหารนี้" }, { status: 404 })
+    }
+
+    if (existing.userId !== userId) {
+      return NextResponse.json({ error: "คุณไม่มีสิทธิ์แก้ไขเมนูอาหารนี้" }, { status: 403 })
+    }
+
+    const updated = await prisma.foodItem.update({
+      where: { id: parsed.id },
+      data: {
+        name: parsed.name,
+        calories: parsed.calories,
+        proteinG: parsed.proteinG,
+        carbsG: parsed.carbsG,
+        fatG: parsed.fatG
+      }
+    })
+
+    return NextResponse.json(updated)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.issues }, { status: 400 })
+    }
+    console.error(error)
+    return NextResponse.json({ error: "Failed to update food item" }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  const userId = await getCurrentUserId()
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  try {
+    const { searchParams } = new URL(req.url)
+    const id = searchParams.get("id")
+    if (!id) return NextResponse.json({ error: "Missing ID parameter" }, { status: 400 })
+
+    const existing = await prisma.foodItem.findUnique({
+      where: { id }
+    })
+
+    if (!existing) {
+      return NextResponse.json({ error: "ไม่พบเมนูอาหารนี้" }, { status: 404 })
+    }
+
+    if (existing.userId !== userId) {
+      return NextResponse.json({ error: "คุณไม่มีสิทธิ์ลบเมนูอาหารนี้" }, { status: 403 })
+    }
+
+    await prisma.foodItem.delete({
+      where: { id }
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error(error)
+    return NextResponse.json({ error: "Failed to delete food item" }, { status: 500 })
   }
 }

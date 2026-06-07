@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getCurrentUserId } from "@/lib/auth-helper"
-import { calculateBMI, calculateBMR, calculateTDEE, calculateAge, calculateWaistToHipRatio } from "@/lib/calculators/health"
+import { calculateBMI, calculateBMR, calculateTDEE, calculateAge, calculateWaistToHipRatio, calculateHealthyWeightLossMacros } from "@/lib/calculators/health"
 
 export async function GET() {
   const userId = await getCurrentUserId()
@@ -176,6 +176,12 @@ export async function GET() {
           carbs: carbsConsumed,
           fat: fatConsumed
         },
+        recommendedMacros: calculateHealthyWeightLossMacros(
+          currentWeight,
+          gender,
+          bmr,
+          tdee
+        ),
         history: calorieHistory
       },
       workouts: {

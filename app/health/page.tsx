@@ -219,12 +219,68 @@ export default function HealthDashboard() {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <CalorieBar 
               consumed={data?.calories?.consumed || 0} 
               target={data?.calories?.target || 2000} 
               burned={data?.calories?.burned || 0} 
             />
+            {data?.calories?.recommendedMacros && (
+              <div className="pt-3 border-t border-white/5 space-y-2.5">
+                <div className="flex justify-between items-center text-[11px] font-bold text-muted-foreground mb-0.5">
+                  <span>เปรียบเทียบสารอาหารแนะนำ (Macros)</span>
+                  <span className="text-[9px] text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/15">เป้าลดน้ำหนัก</span>
+                </div>
+                
+                {/* Protein Bar */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[11px] font-semibold">
+                    <span className="flex items-center gap-1.5 text-muted-foreground"><span className="h-1.5 w-1.5 rounded-full bg-red-500" />โปรตีน (Protein)</span>
+                    <span className="text-muted-foreground">
+                      <strong className="text-foreground">{Math.round(data.calories.macros.protein)}g</strong> / {data.calories.recommendedMacros.proteinG}g
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-secondary/35 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-red-500 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, (data.calories.macros.protein / data.calories.recommendedMacros.proteinG) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Carbs Bar */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[11px] font-semibold">
+                    <span className="flex items-center gap-1.5 text-muted-foreground"><span className="h-1.5 w-1.5 rounded-full bg-blue-500" />คาร์บ (Carbs)</span>
+                    <span className="text-muted-foreground">
+                      <strong className="text-foreground">{Math.round(data.calories.macros.carbs)}g</strong> / {data.calories.recommendedMacros.carbsG}g
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-secondary/35 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, (data.calories.macros.carbs / data.calories.recommendedMacros.carbsG) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Fat Bar */}
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[11px] font-semibold">
+                    <span className="flex items-center gap-1.5 text-muted-foreground"><span className="h-1.5 w-1.5 rounded-full bg-yellow-500" />ไขมัน (Fat)</span>
+                    <span className="text-muted-foreground">
+                      <strong className="text-foreground">{Math.round(data.calories.macros.fat)}g</strong> / {data.calories.recommendedMacros.fatG}g
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-secondary/35 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-yellow-500 rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(100, (data.calories.macros.fat / data.calories.recommendedMacros.fatG) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -242,6 +298,140 @@ export default function HealthDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* New Section: Healthy Weight Loss Analysis */}
+      {data?.calories?.recommendedMacros && (
+        <Card className="glass-card shadow-lg border-amber-500/20 overflow-hidden relative">
+          <div className="absolute top-0 right-0 h-40 w-40 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
+          <CardHeader className="pb-4 border-b border-white/5 bg-amber-500/5">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2 text-amber-500">
+                  <Sparkles className="h-5 w-5 animate-pulse" />
+                  บทวิเคราะห์โภชนาการเพื่อการลดน้ำหนักอย่างสุขภาพดี (Healthy Weight Loss Analysis)
+                </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                  คำนวณและวิเคราะห์สัดส่วนสารอาหารที่เหมาะสมที่สุดจากอัตราส่วนร่างกายและระดับกิจกรรมของคุณ
+                </CardDescription>
+              </div>
+              
+              {data.calories.recommendedMacros.isLimitedBySafety && (
+                <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-full w-fit">
+                  ⚠️ ปรับงบให้อยู่ในเกณฑ์ปลอดภัยขั้นต่ำ
+                </span>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="grid gap-6 md:grid-cols-4">
+              
+              {/* Left Column: Body Ratio Summary */}
+              <div className="space-y-4 md:border-r md:border-white/5 md:pr-6">
+                <h5 className="text-xs font-extrabold text-muted-foreground uppercase tracking-wider">อัตราส่วนและพลังงานพื้นฐาน</h5>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-baseline border-b border-white/5 pb-1">
+                    <span className="text-muted-foreground">น้ำหนักตัวปัจจุบัน</span>
+                    <span className="font-bold text-foreground">{data.weight.current} กิโลกรัม</span>
+                  </div>
+                  <div className="flex justify-between items-baseline border-b border-white/5 pb-1">
+                    <span className="text-muted-foreground">อัตราการเผาผลาญพื้นฐาน (BMR)</span>
+                    <span className="font-bold text-foreground">{data.calories.bmr} kcal</span>
+                  </div>
+                  <div className="flex justify-between items-baseline border-b border-white/5 pb-1">
+                    <span className="text-muted-foreground">การเผาผลาญทั้งหมดต่อวัน (TDEE)</span>
+                    <span className="font-bold text-foreground">{data.calories.tdee} kcal</span>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/10 text-xs text-muted-foreground mt-1 leading-relaxed">
+                    💡 <strong>ระดับกิจกรรม:</strong> {
+                      data.activityLevel === "SEDENTARY" ? "นั่งทำงานเป็นหลัก ไม่ค่อยออกกำลังกาย" : 
+                      data.activityLevel === "LIGHT" ? "ออกกำลังกายเบาๆ 1-3 วัน/สัปดาห์" : 
+                      data.activityLevel === "MODERATE" ? "ออกกำลังกายปานกลาง 3-5 วัน/สัปดาห์" : 
+                      data.activityLevel === "ACTIVE" ? "ออกกำลังกายหนัก 6-7 วัน/สัปดาห์" : "ออกกำลังกายหนักมาก ทำงานที่ใช้แรงมาก"
+                    }
+                  </div>
+                </div>
+              </div>
+
+              {/* Middle Section: Recommended Targets */}
+              <div className="md:col-span-2 space-y-4 md:border-r md:border-white/5 md:px-6">
+                <h5 className="text-xs font-extrabold text-muted-foreground uppercase tracking-wider">แคลอรีและสารอาหารแนะนำต่อวัน (Daily Recommendations)</h5>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  {/* Calorie Target Box */}
+                  <div className="sm:col-span-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold">พลังงานเป้าหมายสำหรับลดน้ำหนัก</span>
+                      <p className="text-2xl font-black text-amber-500">{data.calories.recommendedMacros.caloriesTarget} <span className="text-sm font-semibold">kcal / วัน</span></p>
+                    </div>
+                    <div className="text-right text-xs text-muted-foreground max-w-[60%]">
+                      {data.calories.recommendedMacros.isLimitedBySafety ? (
+                        <p className="text-amber-500 font-semibold">
+                          คำนวณจากเกณฑ์ความปลอดภัยขั้นต่ำเพื่อป้องกันการขาดสารอาหารและสภาวะกล้ามเนื้อสลาย (Crash Diet)
+                        </p>
+                      ) : (
+                        <p>
+                          คำนวณจาก TDEE ({data.calories.tdee} kcal) หักลบพลังงาน 500 kcal เพื่อสร้าง Calorie Deficit อย่างเหมาะสมและยั่งยืน
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Protein Recommended Box */}
+                  <div className="p-3 bg-red-500/5 dark:bg-red-500/10 border border-red-500/15 rounded-xl text-center space-y-1.5">
+                    <span className="text-[10px] text-muted-foreground block font-bold uppercase">โปรตีน (P)</span>
+                    <span className="text-xl font-black text-red-500 block">{data.calories.recommendedMacros.proteinG}g</span>
+                    <span className="text-[10px] text-muted-foreground block bg-black/10 dark:bg-white/5 py-0.5 rounded font-semibold">{data.calories.recommendedMacros.proteinPct}% ({data.calories.recommendedMacros.proteinG * 4} kcal)</span>
+                  </div>
+
+                  {/* Carbs Recommended Box */}
+                  <div className="p-3 bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/15 rounded-xl text-center space-y-1.5">
+                    <span className="text-[10px] text-muted-foreground block font-bold uppercase">คาร์บ (C)</span>
+                    <span className="text-xl font-black text-blue-500 block">{data.calories.recommendedMacros.carbsG}g</span>
+                    <span className="text-[10px] text-muted-foreground block bg-black/10 dark:bg-white/5 py-0.5 rounded font-semibold">{data.calories.recommendedMacros.carbsPct}% ({data.calories.recommendedMacros.carbsG * 4} kcal)</span>
+                  </div>
+
+                  {/* Fat Recommended Box */}
+                  <div className="p-3 bg-yellow-500/5 dark:bg-yellow-500/10 border border-yellow-500/15 rounded-xl text-center space-y-1.5">
+                    <span className="text-[10px] text-muted-foreground block font-bold uppercase">ไขมัน (F)</span>
+                    <span className="text-xl font-black text-yellow-500 block">{data.calories.recommendedMacros.fatG}g</span>
+                    <span className="text-[10px] text-muted-foreground block bg-black/10 dark:bg-white/5 py-0.5 rounded font-semibold">{data.calories.recommendedMacros.fatPct}% ({data.calories.recommendedMacros.fatG * 9} kcal)</span>
+                  </div>
+
+                  {/* Healthy Tips mini box */}
+                  <div className="p-3 bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/15 rounded-xl flex items-center justify-center text-center">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] text-emerald-500 block font-bold uppercase">อัตราลดน้ำหนักคาดการณ์</span>
+                      <span className="text-sm font-black text-emerald-500 block">~0.45 kg / สัปดาห์</span>
+                      <span className="text-[9px] text-muted-foreground block">ลดไขมัน ปลอดภัย</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Section: Nutrition Science and Guidance */}
+              <div className="space-y-4 md:pl-6">
+                <h5 className="text-xs font-extrabold text-muted-foreground uppercase tracking-wider">หลักการลดน้ำหนักอย่างแข็งแรง</h5>
+                <ul className="space-y-2.5 text-xs text-muted-foreground leading-relaxed">
+                  <li className="flex gap-2">
+                    <span className="text-red-500 font-extrabold mt-0.5">💪</span>
+                    <span><strong>ทานโปรตีนสูง (1.8g/น้ำหนักตัว):</strong> เพื่อรักษามวลกล้ามเนื้อ (Lean Mass) ขณะร่างกายดึงไขมันสะสมมาใช้ และทำให้อิ่มท้องนานขึ้น ไม่หิวบ่อย</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-yellow-500 font-extrabold mt-0.5">🥑</span>
+                    <span><strong>เน้นไขมันดี (25%):</strong> ช่วยเรื่องการทำงานของระบบฮอร์โมน การทำงานของสมอง และการดูดซึมวิตามิน A, D, E, K</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-blue-500 font-extrabold mt-0.5">🌾</span>
+                    <span><strong>คาร์โบไฮเดรตเชิงซ้อน:</strong> ช่วยเสริมพลังงานในการทำกิจกรรมและการออกกำลังกาย เพื่อไม่ให้รู้สึกอ่อนเพลีย สมองตื้อ หรือมีอาการตบะแตกภายหลัง</span>
+                  </li>
+                </ul>
+              </div>
+
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
 
       {/* Row 2: Weight Chart & Exercise Aggregates */}
       <div className="grid gap-6 md:grid-cols-3">

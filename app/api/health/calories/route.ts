@@ -12,7 +12,8 @@ const calorieLogSchema = z.object({
   proteinG: z.number().min(0).nullable().optional(),
   carbsG: z.number().min(0).nullable().optional(),
   fatG: z.number().min(0).nullable().optional(),
-  note: z.string().nullable().optional()
+  note: z.string().nullable().optional(),
+  saveToDb: z.boolean().optional()
 })
 
 export async function GET(req: NextRequest) {
@@ -71,6 +72,34 @@ export async function POST(req: NextRequest) {
       }
     })
 
+    // Automatically save to food database (FoodItem) if it doesn't exist yet
+    const existingFood = await prisma.foodItem.findFirst({
+      where: {
+        OR: [
+          { userId: null },
+          { userId }
+        ],
+        name: {
+          equals: parsed.foodName,
+          mode: "insensitive"
+        }
+      }
+    })
+
+    if (parsed.saveToDb && !existingFood) {
+      await prisma.foodItem.create({
+        data: {
+          userId,
+          name: parsed.foodName,
+          calories: parsed.calories,
+          proteinG: parsed.proteinG,
+          carbsG: parsed.carbsG,
+          fatG: parsed.fatG,
+          isCustom: true
+        }
+      })
+    }
+
     return NextResponse.json(result)
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -106,6 +135,34 @@ export async function PATCH(req: NextRequest) {
         note: parsed.note
       }
     })
+
+    // Automatically save to food database (FoodItem) if it doesn't exist yet
+    const existingFood = await prisma.foodItem.findFirst({
+      where: {
+        OR: [
+          { userId: null },
+          { userId }
+        ],
+        name: {
+          equals: parsed.foodName,
+          mode: "insensitive"
+        }
+      }
+    })
+
+    if (parsed.saveToDb && !existingFood) {
+      await prisma.foodItem.create({
+        data: {
+          userId,
+          name: parsed.foodName,
+          calories: parsed.calories,
+          proteinG: parsed.proteinG,
+          carbsG: parsed.carbsG,
+          fatG: parsed.fatG,
+          isCustom: true
+        }
+      })
+    }
 
     return NextResponse.json(result)
   } catch (error) {

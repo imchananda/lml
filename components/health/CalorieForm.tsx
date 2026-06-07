@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { Loader2, Search, Plus } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 
 type CalorieLog = {
   id?: string
@@ -21,11 +22,14 @@ type CalorieLog = {
 }
 
 type FoodItem = {
+  id?: string
   name: string
   calories: number
   proteinG?: number | null
   carbsG?: number | null
   fatG?: number | null
+  isCustom?: boolean
+  userId?: string | null
 }
 
 export function CalorieForm({ 
@@ -48,7 +52,7 @@ export function CalorieForm({
   const [carbs, setCarbs] = useState<string>(initialData?.carbsG ? String(initialData.carbsG) : "")
   const [fat, setFat] = useState<string>(initialData?.fatG ? String(initialData.fatG) : "")
   const [note, setNote] = useState<string>(initialData?.note || "")
-  const [saveToDb, setSaveToDb] = useState(false)
+  const [saveToDb, setSaveToDb] = useState(true)
 
   // Sync state if initialData changes
   useEffect(() => {
@@ -83,7 +87,7 @@ export function CalorieForm({
     }
     setSearching(true)
     try {
-      const res = await fetch(`/api/health/food?query=${encodeURIComponent(query)}`)
+      const res = await fetch(`/api/health/food?query=${encodeURIComponent(query)}&limit=10`)
       if (res.ok) {
         setSearchResults(await res.json())
       }
@@ -123,20 +127,6 @@ export function CalorieForm({
     const fd = new FormData(e.currentTarget)
 
     try {
-      // 1. If checked "saveToDb", save this food item to the custom food items first
-      if (saveToDb) {
-        await fetch("/api/health/food", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: foodName,
-            calories: Number(calories),
-            proteinG: protein ? Number(protein) : null,
-            carbsG: carbs ? Number(carbs) : null,
-            fatG: fat ? Number(fat) : null
-          })
-        })
-      }
 
       // 2. Log calories consumed
       const method = initialData?.id ? "PATCH" : "POST"
@@ -152,7 +142,8 @@ export function CalorieForm({
           proteinG: protein ? Number(protein) : null,
           carbsG: carbs ? Number(carbs) : null,
           fatG: fat ? Number(fat) : null,
-          note: note || null
+          note: note || null,
+          saveToDb: !initialData ? saveToDb : undefined
         })
       })
 
@@ -193,11 +184,18 @@ export function CalorieForm({
                 <button
                   key={i}
                   type="button"
-                  className="w-full text-left px-3 py-2.5 hover:bg-muted rounded-lg text-sm flex justify-between items-center transition-colors"
+                  className="w-full text-left px-3 py-2 hover:bg-muted rounded-lg text-sm flex justify-between items-center transition-colors gap-2"
                   onClick={() => handleSelectFood(food)}
                 >
-                  <span className="font-semibold">{food.name}</span>
-                  <span className="text-xs text-amber-500 font-bold bg-amber-500/10 px-2 py-0.5 rounded-full">
+                  <div className="flex flex-col min-w-0">
+                    <span className="font-semibold text-foreground truncate">{food.name}</span>
+                    {(food.proteinG !== null || food.carbsG !== null || food.fatG !== null) && (
+                      <span className="text-[10px] text-muted-foreground mt-0.5">
+                        โปรตีน: {food.proteinG ?? 0}g | คาร์บ: {food.carbsG ?? 0}g | ไขมัน: {food.fatG ?? 0}g
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-amber-500 font-bold bg-amber-500/10 px-2.5 py-1 rounded-full whitespace-nowrap">
                     {food.calories} kcal
                   </span>
                 </button>
@@ -301,21 +299,25 @@ export function CalorieForm({
           <Input id="note" name="note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="เช่น ทานที่ร้านป้าแดง..." />
         </div>
 
-        {/* Save to Food database checkbox */}
+        {/* Save to Food database switch */}
         {!initialData && (
-          <div className="flex items-center gap-2 px-1">
-            <input
+          <div className="flex items-center justify-between gap-3 bg-black/10 dark:bg-white/5 border border-white/10 dark:border-white/5 p-3.5 rounded-xl">
+            <div className="space-y-0.5">
+              <Label htmlFor="saveToDb" className="text-sm font-semibold text-foreground cursor-pointer">
+                บันทึกลงคลังอาหารอัตโนมัติ
+              </Label>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                บันทึกเมนูนี้พร้อมพลังงานและสารอาหารหลักลงคลังเพื่อเรียกใช้งานในวันถัดไป
+              </p>
+            </div>
+            <Switch
               id="saveToDb"
-              type="checkbox"
               checked={saveToDb}
-              onChange={(e) => setSaveToDb(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500 bg-secondary"
+              onCheckedChange={setSaveToDb}
             />
-            <Label htmlFor="saveToDb" className="text-xs font-medium cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
-              เพิ่มอาหารนี้เข้าไปในฐานข้อมูลอาหารของฉันถาวร (Save for future searches)
-            </Label>
           </div>
         )}
+
 
         <Button type="submit" disabled={loading} className="w-full bg-amber-500 hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-700 text-white h-12 rounded-xl shadow-lg mt-4 transition-all">
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
