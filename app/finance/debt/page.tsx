@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { CreditCard, Flame, Plus, Loader2, Pencil, Trash2, ChevronLeft, ChevronRight, BarChart4 } from "lucide-react"
+import { CreditCard, Flame, Plus, Loader2, Pencil, Trash2, ChevronLeft, ChevronRight, BarChart4, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DebtForm } from "@/components/forms/DebtForm"
@@ -18,9 +18,15 @@ type Debt = {
 export default function DebtPage() {
   const [open, setOpen] = useState(false)
   const [editDebt, setEditDebt] = useState<Debt | null>(null)
+  const [duplicateDebt, setDuplicateDebt] = useState<Debt | null>(null)
   const [debts, setDebts] = useState<Debt[]>([])
   const [loading, setLoading] = useState(true)
   const [currentDate, setCurrentDate] = useState(() => new Date())
+
+  const handleDuplicate = (d: Debt) => {
+    const { id, asOfDate, ...rest } = d
+    setDuplicateDebt(rest as any)
+  }
 
   const fetchData = useCallback(async () => {
     try {
@@ -232,6 +238,9 @@ export default function DebtPage() {
                         <p className="text-[10px] text-muted-foreground">As of {d.asOfDate ? new Date(d.asOfDate).toLocaleDateString('th-TH') : 'ไม่ระบุ'}</p>
                       </div>
                       <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => handleDuplicate(d)} className="gap-1 border-emerald-500/30 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950">
+                          <Copy className="h-3.5 w-3.5" /> คัดลอก
+                        </Button>
                         <Button variant="outline" size="sm" onClick={() => setEditDebt(d)} className="gap-1 border-blue-500/30 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950">
                           <Pencil className="h-3.5 w-3.5" /> แก้ไข
                         </Button>
@@ -253,6 +262,23 @@ export default function DebtPage() {
         <DialogContent className="sm:max-w-[425px] glass-card border-white/10">
           <DialogHeader><DialogTitle>Edit Debt</DialogTitle><DialogDescription>แก้ไขรายละเอียดหนี้สิน</DialogDescription></DialogHeader>
           {editDebt && <DebtForm initialData={editDebt} onSuccess={() => { setEditDebt(null); fetchData() }} />}
+        </DialogContent>
+      </Dialog>
+
+      {/* Duplicate Dialog */}
+      <Dialog open={!!duplicateDebt} onOpenChange={(val) => !val && setDuplicateDebt(null)}>
+        <DialogContent className="sm:max-w-[425px] glass-card border-white/10">
+          <DialogHeader>
+            <DialogTitle>คัดลอกหนี้สิน (Duplicate Debt)</DialogTitle>
+            <DialogDescription>สร้างรายการหนี้สินใหม่โดยใช้ข้อมูลเริ่มต้นจาก {duplicateDebt?.name}</DialogDescription>
+          </DialogHeader>
+          {duplicateDebt && (
+            <DebtForm 
+              initialData={duplicateDebt} 
+              defaultDate={currentDate} 
+              onSuccess={() => { setDuplicateDebt(null); fetchData() }} 
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>
