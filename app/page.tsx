@@ -42,7 +42,7 @@ export default async function HomeHubPage() {
   ] = await Promise.all([
     // 1. Finance Metrics
     prisma.savingPot.aggregate({ _sum: { savedAmount: true }, where: { userId, isActive: true } }),
-    prisma.debt.aggregate({ _sum: { currentBalance: true }, where: { userId, isActive: true } }),
+    prisma.debt.findMany({ where: { userId, isActive: true } }),
     prisma.investment.findMany({ where: { userId } }),
     prisma.transaction.aggregate({
       _sum: { amount: true },
@@ -146,7 +146,18 @@ export default async function HomeHubPage() {
     .slice(0, 5);
 
   const totalSavingsVal = totalSavings._sum.savedAmount || 0
-  const totalDebtVal = totalDebt._sum.currentBalance || 0
+  
+  // Group active debts by name (case-insensitive) and select the latest record for each
+  const latestDebtsByName: Record<string, typeof totalDebt[0]> = {}
+  totalDebt.forEach(d => {
+    const nameKey = d.name.trim().toLowerCase()
+    const existing = latestDebtsByName[nameKey]
+    if (!existing || new Date(d.asOfDate) > new Date(existing.asOfDate)) {
+      latestDebtsByName[nameKey] = d
+    }
+  })
+  const totalDebtVal = Object.values(latestDebtsByName).reduce((s, d) => s + d.currentBalance, 0)
+  
   const totalInvestmentValue = investments.reduce((sum, inv) => sum + (inv.currentPrice ?? 0) * inv.quantity, 0)
   const netWorth = totalSavingsVal + totalInvestmentValue - totalDebtVal
 

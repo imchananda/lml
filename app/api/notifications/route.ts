@@ -58,7 +58,7 @@ export async function GET() {
       (prisma as any).notificationSetting.findMany({ where: { userId }, select: { key: true, enabled: true, threshold: true, dayInterval: true } }),
       // Finance
       prisma.transaction.aggregate({ _sum: { amount: true }, where: { userId, type: "INCOME", date: { gte: monthStart, lt: monthEnd } } }),
-      prisma.debt.aggregate({ _sum: { minimumPayment: true }, where: { userId, isActive: true } }),
+      prisma.debt.findMany({ where: { userId, isActive: true } }),
       prisma.transaction.aggregate({ _sum: { amount: true }, where: { userId, type: "EXPENSE", date: { gte: monthStart, lt: monthEnd } } }),
       // Health
       prisma.bodyMetric.findFirst({ where: { userId }, orderBy: { date: "desc" }, select: { weightKg: true, date: true } }),
@@ -141,7 +141,16 @@ export async function GET() {
 
     const monthlyIncome = incomeAgg._sum.amount || 0
     const monthlyExpense = expenseAgg._sum.amount || 0
-    const totalMinPayment = debtMinPayments._sum.minimumPayment || 0
+    // Group active debts by name (case-insensitive) and select the latest record for each
+    const latestDebtsByName: Record<string, typeof debtMinPayments[0]> = {}
+    debtMinPayments.forEach(d => {
+      const nameKey = d.name.trim().toLowerCase()
+      const existing = latestDebtsByName[nameKey]
+      if (!existing || new Date(d.asOfDate) > new Date(existing.asOfDate)) {
+        latestDebtsByName[nameKey] = d
+      }
+    })
+    const totalMinPayment = Object.values(latestDebtsByName).reduce((s, d) => s + d.minimumPayment, 0)
     const dsr = monthlyIncome > 0 ? Math.round((totalMinPayment / monthlyIncome) * 100) : 0
     const savingsRate = monthlyIncome > 0 ? Math.round(((monthlyIncome - monthlyExpense) / monthlyIncome) * 100) : 0
 

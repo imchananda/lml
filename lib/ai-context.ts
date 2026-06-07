@@ -82,10 +82,22 @@ export async function getUserFinancialContext(userId: string) {
 
   // ─── Debt & DSR ─────────────────────────────────────────────
   const debts = await prisma.debt.findMany({ where: { userId, isActive: true } })
-  const totalDebt    = debts.reduce((s, d) => s + d.currentBalance, 0)
-  const totalMinPmt  = debts.reduce((s, d) => s + d.minimumPayment, 0)
+  
+  // Group active debts by name (case-insensitive) and select the latest record for each
+  const latestDebtsByName: Record<string, typeof debts[0]> = {}
+  debts.forEach(d => {
+    const nameKey = d.name.trim().toLowerCase()
+    const existing = latestDebtsByName[nameKey]
+    if (!existing || new Date(d.asOfDate) > new Date(existing.asOfDate)) {
+      latestDebtsByName[nameKey] = d
+    }
+  })
+  const latestDebtsList = Object.values(latestDebtsByName)
+  
+  const totalDebt    = latestDebtsList.reduce((s, d) => s + d.currentBalance, 0)
+  const totalMinPmt  = latestDebtsList.reduce((s, d) => s + d.minimumPayment, 0)
   const dsr          = monthlyIncome > 0 ? Math.round((totalMinPmt / monthlyIncome) * 100) : 0
-  const highestApr   = debts.length > 0 ? Math.max(...debts.map(d => d.interestRate)) : 0
+  const highestApr   = latestDebtsList.length > 0 ? Math.max(...latestDebtsList.map(d => d.interestRate)) : 0
 
   // ─── Savings ─────────────────────────────────────────────────
   const savingsAgg = await prisma.savingPot.aggregate({
@@ -145,7 +157,7 @@ export async function getUserFinancialContext(userId: string) {
       total:      Math.round(totalDebt),
       dsr,
       highestApr,
-      debtCount:  debts.length,
+      debtCount:  latestDebtsList.length,
     },
     tax: taxSummary,
     goals: {
