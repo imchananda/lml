@@ -42,33 +42,14 @@ export default function DebtPage() {
   const prevMonth = () => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
   const nextMonth = () => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
 
-  // Helper to get active debts as of a specific date (end of that month)
-  const getDebtsAsOf = useCallback((date: Date, allDebts: Debt[]) => {
-    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999)
-    
-    // Filter debts whose asOfDate is on or before the end of this month
-    const debtsBefore = allDebts.filter(d => {
-      if (!d.asOfDate) return false
-      return new Date(d.asOfDate) <= endOfMonth
-    })
-    
-    // Group by name (case-insensitive, trimmed) and find the latest entry for each
-    const latestByName: Record<string, Debt> = {}
-    debtsBefore.forEach(d => {
-      const nameKey = d.name.trim().toLowerCase()
-      const existing = latestByName[nameKey]
-      if (!existing || new Date(d.asOfDate) > new Date(existing.asOfDate)) {
-        latestByName[nameKey] = d
-      }
-    })
-    
-    return Object.values(latestByName)
-  }, [])
-
   // Filter debts by selected month and year
   const filteredDebts = useMemo(() => {
-    return getDebtsAsOf(currentDate, debts)
-  }, [debts, currentDate, getDebtsAsOf])
+    return debts.filter(d => {
+      if (!d.asOfDate) return false
+      const date = new Date(d.asOfDate)
+      return date.getMonth() === currentDate.getMonth() && date.getFullYear() === currentDate.getFullYear()
+    })
+  }, [debts, currentDate])
 
   const totalDebt = filteredDebts.reduce((s, d) => s + d.currentBalance, 0)
   const totalMinPay = filteredDebts.reduce((s, d) => s + d.minimumPayment, 0)
@@ -81,41 +62,34 @@ export default function DebtPage() {
 
   // Prepare monthly comparison chart data
   const chartData = useMemo(() => {
-    const monthsMap: Record<string, Date> = {}
+    const groups: Record<string, { monthKey: string; date: Date; total: number }> = {}
     
-    // Collect all unique months from the database
     debts.forEach(d => {
       if (!d.asOfDate) return
       const date = new Date(d.asOfDate)
-      const key = `${date.getFullYear()}-${date.getMonth()}`
-      if (!monthsMap[key]) {
-        monthsMap[key] = new Date(date.getFullYear(), date.getMonth(), 1)
+      const year = date.getFullYear()
+      const month = date.getMonth()
+      const key = `${year}-${month}`
+      
+      if (!groups[key]) {
+        const monthName = date.toLocaleString('en-US', { month: 'short' })
+        const shortYear = date.getFullYear().toString().substring(2)
+        groups[key] = {
+          monthKey: `${monthName} '${shortYear}`,
+          date: new Date(year, month, 1),
+          total: 0
+        }
       }
+      groups[key].total += d.currentBalance
     })
     
-    // Ensure the current selected month is also included in the trend
-    const currentKey = `${currentDate.getFullYear()}-${currentDate.getMonth()}`
-    if (!monthsMap[currentKey]) {
-      monthsMap[currentKey] = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
-    }
-    
-    // Sort months chronologically
-    const sortedMonths = Object.values(monthsMap).sort((a, b) => a.getTime() - b.getTime())
-    
-    // Calculate total debt for each month as of the end of that month
-    return sortedMonths.map(monthDate => {
-      const debtsAsOf = getDebtsAsOf(monthDate, debts)
-      const total = debtsAsOf.reduce((s, d) => s + d.currentBalance, 0)
-      
-      const monthName = monthDate.toLocaleString('en-US', { month: 'short' })
-      const shortYear = monthDate.getFullYear().toString().substring(2)
-      
-      return {
-        month: `${monthName} '${shortYear}`,
-        "ยอดหนี้รวม": total,
-      }
-    })
-  }, [debts, currentDate, getDebtsAsOf])
+    return Object.values(groups)
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .map(g => ({
+        month: g.monthKey,
+        "ยอดหนี้รวม": g.total,
+      }))
+  }, [debts])
 
   const debtTypeLabels: Record<string, string> = {
     CREDIT_CARD: "บัตรเครดิต", PERSONAL_LOAN: "สินเชื่อส่วนบุคคล",
