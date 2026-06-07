@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { CreditCard, Flame, Plus, Loader2, Pencil, Trash2 } from "lucide-react"
+import { useState, useEffect, useCallback, useMemo } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CreditCard, Flame, Plus, Loader2, Pencil, Trash2, ChevronLeft, ChevronRight, BarChart4 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { DebtForm } from "@/components/forms/DebtForm"
 import { calcPayoffMonths } from "@/lib/calculators/debt"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts"
 
 type Debt = {
   id: string; name: string; type: string; totalAmount: number
@@ -19,6 +20,7 @@ export default function DebtPage() {
   const [editDebt, setEditDebt] = useState<Debt | null>(null)
   const [debts, setDebts] = useState<Debt[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentDate, setCurrentDate] = useState(() => new Date())
 
   const fetchData = useCallback(async () => {
     try {
@@ -36,14 +38,58 @@ export default function DebtPage() {
     fetchData()
   }
 
-  const totalDebt = debts.reduce((s, d) => s + d.currentBalance, 0)
-  const totalMinPay = debts.reduce((s, d) => s + d.minimumPayment, 0)
+  // Month navigation handlers
+  const prevMonth = () => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
+  const nextMonth = () => setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
 
-  // Estimate debt-free date using avg interest rate
-  const avgRate = debts.length ? debts.reduce((s, d) => s + d.interestRate, 0) / debts.length : 0
+  // Filter debts by selected month and year
+  const filteredDebts = useMemo(() => {
+    return debts.filter(d => {
+      if (!d.asOfDate) return false
+      const date = new Date(d.asOfDate)
+      return date.getMonth() === currentDate.getMonth() && date.getFullYear() === currentDate.getFullYear()
+    })
+  }, [debts, currentDate])
+
+  const totalDebt = filteredDebts.reduce((s, d) => s + d.currentBalance, 0)
+  const totalMinPay = filteredDebts.reduce((s, d) => s + d.minimumPayment, 0)
+
+  // Estimate debt-free date using avg interest rate of filtered debts
+  const avgRate = filteredDebts.length ? filteredDebts.reduce((s, d) => s + d.interestRate, 0) / filteredDebts.length : 0
   const estMonths = totalDebt > 0 ? calcPayoffMonths(totalDebt, avgRate, totalMinPay) : 0
-  const freeDate = new Date()
+  const freeDate = new Date(currentDate)
   freeDate.setMonth(freeDate.getMonth() + (estMonths === Infinity ? 999 : estMonths))
+
+  // Prepare monthly comparison chart data
+  const chartData = useMemo(() => {
+    const groups: Record<string, { monthKey: string; date: Date; total: number }> = {}
+    
+    debts.forEach(d => {
+      if (!d.asOfDate) return
+      const date = new Date(d.asOfDate)
+      const year = date.getFullYear()
+      const month = date.getMonth()
+      const key = `${year}-${month}`
+      
+      if (!groups[key]) {
+        const monthName = date.toLocaleString('en-US', { month: 'short' })
+        const shortYear = date.getFullYear().toString().substring(2)
+        groups[key] = {
+          monthKey: `${monthName} '${shortYear}`,
+          date: new Date(year, month, 1),
+          total: 0
+        }
+      }
+      groups[key].total += d.currentBalance
+    })
+    
+    return Object.values(groups)
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .map(g => ({
+        month: g.monthKey,
+        "ยอดหนี้รวม": g.total,
+      }))
+  }, [debts])
 
   const debtTypeLabels: Record<string, string> = {
     CREDIT_CARD: "บัตรเครดิต", PERSONAL_LOAN: "สินเชื่อส่วนบุคคล",
@@ -59,15 +105,30 @@ export default function DebtPage() {
           <h2 className="text-3xl font-bold tracking-tight text-gradient inline-block w-fit">Debt Manager</h2>
           <p className="text-muted-foreground">Track and strategize your debt payoff.</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger render={<Button className="bg-red-500 hover:bg-red-600 shadow-md text-white" />}>
-            <Plus className="mr-2 h-4 w-4" />Add Debt
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px] glass-card border-white/10">
-            <DialogHeader><DialogTitle>Add New Debt</DialogTitle><DialogDescription>Track a loan or credit card.</DialogDescription></DialogHeader>
-            <DebtForm onSuccess={() => { setOpen(false); fetchData() }} />
-          </DialogContent>
-        </Dialog>
+        
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2 bg-secondary/30 p-1 rounded-xl shadow-sm border border-border/50">
+            <Button variant="ghost" size="icon" onClick={prevMonth} className="h-8 w-8 hover:bg-background">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="font-semibold min-w-[130px] text-center text-sm">
+              {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </div>
+            <Button variant="ghost" size="icon" onClick={nextMonth} className="h-8 w-8 hover:bg-background">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger render={<Button className="bg-red-500 hover:bg-red-600 shadow-md text-white" />}>
+              <Plus className="mr-2 h-4 w-4" />Add Debt
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px] glass-card border-white/10">
+              <DialogHeader><DialogTitle>Add New Debt</DialogTitle><DialogDescription>Track a loan or credit card.</DialogDescription></DialogHeader>
+              <DebtForm defaultDate={currentDate} onSuccess={() => { setOpen(false); fetchData() }} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
@@ -82,7 +143,7 @@ export default function DebtPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-              {debts.length > 0 && estMonths !== Infinity ? freeDate.toLocaleDateString('en', { month: 'short', year: 'numeric' }) : '—'}
+              {filteredDebts.length > 0 && estMonths !== Infinity ? freeDate.toLocaleDateString('en', { month: 'short', year: 'numeric' }) : '—'}
             </div>
             <p className="text-xs text-muted-foreground mt-1">{estMonths !== Infinity ? `~${estMonths} months left` : 'Add payments to estimate'}</p>
           </CardContent>
@@ -93,11 +154,57 @@ export default function DebtPage() {
         </Card>
       </div>
 
-      {debts.length === 0 ? (
-        <div className="text-center text-muted-foreground py-16">No debts tracked. Click "Add Debt" to start!</div>
+      {chartData.length > 0 && (
+        <Card className="glass-card shadow-lg shadow-red-500/5 border-red-500/20 bg-gradient-to-br from-background to-red-500/5">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <BarChart4 className="h-5 w-5 text-red-500" />
+              เปรียบเทียบยอดหนี้สินรายเดือน (Monthly Debt Comparison)
+            </CardTitle>
+            <CardDescription>แนวโน้มยอดหนี้คงค้างรวมในแต่ละเดือน</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[250px] pl-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorDebtVal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0.2}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-muted" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
+                <YAxis 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={v => v >= 1000 ? `฿${(v / 1000).toLocaleString()}k` : `฿${v}`}
+                />
+                <RechartsTooltip
+                  contentStyle={{ 
+                    borderRadius: '12px', 
+                    border: '1px solid rgba(255,255,255,0.1)', 
+                    background: 'rgba(15,15,20,0.9)', 
+                    color: '#fff' 
+                  }}
+                  formatter={(value: any) => [`฿${Number(value).toLocaleString()}`, 'ยอดหนี้รวม']}
+                />
+                <Bar dataKey="ยอดหนี้รวม" fill="url(#colorDebtVal)" radius={[6, 6, 0, 0]} maxBarSize={50} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
+
+      {filteredDebts.length === 0 ? (
+        <div className="text-center text-muted-foreground py-16">
+          {debts.length === 0 
+            ? 'No debts tracked. Click "Add Debt" to start!'
+            : 'ไม่มีรายการหนี้สินที่บันทึกไว้ในเดือนนี้ คลิก "Add Debt" เพื่อเริ่มบันทึก หรือย้อนกลับไปดูเดือนที่มีข้อมูล'}
+        </div>
       ) : (
         <div className="grid gap-4">
-          {debts.map((d) => {
+          {filteredDebts.map((d) => {
             const paidPct = d.totalAmount > 0 ? Math.round(((d.totalAmount - d.currentBalance) / d.totalAmount) * 100) : 0
             const months = calcPayoffMonths(d.currentBalance, d.interestRate, d.minimumPayment)
             return (

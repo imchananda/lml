@@ -18,7 +18,7 @@ const debtTypes = [
   { value: "OTHER", label: "อื่นๆ" },
 ]
 
-export function DebtForm({ onSuccess, initialData }: { onSuccess?: () => void, initialData?: any }) {
+export function DebtForm({ onSuccess, initialData, defaultDate }: { onSuccess?: () => void, initialData?: any, defaultDate?: Date }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [debtType, setDebtType] = useState(initialData?.type || "CREDIT_CARD")
@@ -34,6 +34,11 @@ export function DebtForm({ onSuccess, initialData }: { onSuccess?: () => void, i
   let defaultAsOfDate = new Date().toISOString().split('T')[0]
   if (initialData?.asOfDate) {
     defaultAsOfDate = new Date(initialData.asOfDate).toISOString().split('T')[0]
+  } else if (defaultDate) {
+    const year = defaultDate.getFullYear()
+    const month = String(defaultDate.getMonth() + 1).padStart(2, '0')
+    const day = String(defaultDate.getDate()).padStart(2, '0')
+    defaultAsOfDate = `${year}-${month}-${day}`
   }
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
